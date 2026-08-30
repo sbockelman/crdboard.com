@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Table {{ table_id }}</title>
+    <style>
+      body { font-family: sans-serif; margin: 0; }
+      #toolbar { padding: 8px; border-bottom: 1px solid #ddd; display: flex; gap: 8px; flex-wrap: wrap; }
+      #presence { margin-left: auto; }
+      #table-surface {
+        position: relative;
+        width: 100%;
+        height: calc(100vh - 120px);
+        background: #1f4d3f;
+        overflow: hidden;
+      }
+      .obj {
+        position: absolute;
+        width: 90px;
+        height: 130px;
+        border: 1px solid #111;
+        border-radius: 6px;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+        cursor: grab;
+      }
+      .front { background: #276ef1; }
+      .back { background: #a10000; }
+      #status { height: 80px; overflow: auto; margin: 0; border-top: 1px solid #ddd; padding: 8px; white-space: pre-wrap; }
+    </style>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  </head>
+  <body data-table-id="{{ table_id }}">
+    <div id="toolbar">
+      <button id="print-card">Print card</button>
+      <button id="flip-selected">Flip</button>
+      <button id="rotate-selected">Rotate 90°</button>
+      <button id="bring-front">Bring to front</button>
+      <button id="stack-selected">Stack selected</button>
+      <span id="presence"></span>
+    </div>
+    <div id="table-surface"></div>
+    <pre id="status"></pre>
+    <script src="/static/table.js"></script>
+  </body>
+</html>

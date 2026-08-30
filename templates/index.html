@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>crdboard login</title>
+  </head>
+  <body>
+    <h1>crdboard</h1>
+    <form id="register-form">
+      <h2>Register</h2>
+      <input name="username" placeholder="username" required />
+      <input name="password" type="password" placeholder="password" required />
+      <button type="submit">Register</button>
+    </form>
+    <form id="login-form">
+      <h2>Login</h2>
+      <input name="username" placeholder="username" required />
+      <input name="password" type="password" placeholder="password" required />
+      <button type="submit">Login</button>
+    </form>
+    <pre id="status"></pre>
+    <script>
+      async function post(path, body) {
+        const response = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        return response.json();
+      }
+      function bind(formId, endpoint) {
+        document.getElementById(formId).addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const form = new FormData(e.target);
+          const payload = Object.fromEntries(form.entries());
+          const result = await post(endpoint, payload);
+          document.getElementById("status").textContent = JSON.stringify(result, null, 2);
+          if (result.user) window.location.href = "/dashboard";
+        });
+      }
+      bind("register-form", "/api/register");
+      bind("login-form", "/api/login");
+    </script>
+  </body>
+</html>

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>crdboard dashboard</title>
+  </head>
+  <body>
+    <h1>Dashboard</h1>
+    <button id="logout">Logout</button>
+    <h2>Create table</h2>
+    <form id="create-table-form">
+      <input name="name" placeholder="Table name" required />
+      <button type="submit">Create table</button>
+    </form>
+    <h2>Your tables</h2>
+    <ul id="tables"></ul>
+    <script>
+      async function refreshTables() {
+        const response = await fetch("/api/tables");
+        const result = await response.json();
+        const list = document.getElementById("tables");
+        list.innerHTML = "";
+        for (const t of result.tables || []) {
+          const li = document.createElement("li");
+          li.innerHTML = `<a href="/tables/${t.id}">${t.name}</a> (${t.role})`;
+          list.appendChild(li);
+        }
+      }
+      document.getElementById("create-table-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const form = new FormData(e.target);
+        await fetch("/api/tables", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.fromEntries(form.entries())),
+        });
+        e.target.reset();
+        await refreshTables();
+      });
+      document.getElementById("logout").addEventListener("click", async () => {
+        await fetch("/api/logout", { method: "POST" });
+        window.location.href = "/";
+      });
+      refreshTables();
+    </script>
+  </body>
+</html>
