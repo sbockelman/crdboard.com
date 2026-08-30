@@ -1,13 +1,4 @@
 apiVersion: v1
-kind: Secret
-metadata:
-  name: crdboard-secrets
-type: Opaque
-stringData:
-  CRDBOARD_SECRET_KEY: change-me
-  CRDBOARD_TABLE_ACCESS_SECRET: change-me-too
----
-apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: main-app-data

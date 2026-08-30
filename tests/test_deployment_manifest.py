@@ -7,11 +7,12 @@ def test_kubernetes_deployment_manifest_defines_main_and_table_services():
     assert manifest.count("kind: Deployment") == 2
     assert manifest.count("kind: Service") == 2
     assert manifest.count("kind: PersistentVolumeClaim") == 2
-    assert "name: crdboard-secrets" in manifest
     assert "name: main-app" in manifest
     assert "name: table-server-1" in manifest
     assert "image: crdboard-main:latest" in manifest
     assert "image: crdboard-table-server:latest" in manifest
+    assert "secretKeyRef:" in manifest
+    assert "name: crdboard-secrets" in manifest
     assert "name: CRDBOARD_TABLE_SERVER_PUBLIC_HOST" in manifest
     assert "value: 127.0.0.1" in manifest
     assert "name: CRDBOARD_TABLE_ID" in manifest

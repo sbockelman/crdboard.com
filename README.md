@@ -74,6 +74,9 @@ docker build -f Dockerfile.table-server -t crdboard-table-server:latest .
 2. Apply the manifest:
 
 ```bash
+kubectl create secret generic crdboard-secrets \
+  --from-literal=CRDBOARD_SECRET_KEY=replace-me \
+  --from-literal=CRDBOARD_TABLE_ACCESS_SECRET=replace-me-too
 kubectl apply -f deployment.yml
 ```
 
@@ -84,4 +87,4 @@ kubectl port-forward svc/main-app 5000:5000
 kubectl port-forward svc/table-server-1 7001:7001
 ```
 
-The manifest expects `crdboard-secrets` values in `deployment.yml` to be updated before deployment. It sets `CRDBOARD_TABLE_SERVER_PUBLIC_HOST` to `127.0.0.1` so the browser can connect to the example table-server while those port-forwards are active.
+The manifest expects an existing `crdboard-secrets` Kubernetes secret. It sets `CRDBOARD_TABLE_SERVER_PUBLIC_HOST` to `127.0.0.1` so the browser can connect to the example table-server while those port-forwards are active.
