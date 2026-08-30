@@ -1,0 +1,145 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: crdboard-secrets
+type: Opaque
+stringData:
+  CRDBOARD_SECRET_KEY: change-me
+  CRDBOARD_TABLE_ACCESS_SECRET: change-me-too
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: main-app-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: table-server-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: main-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: main-app
+  template:
+    metadata:
+      labels:
+        app: main-app
+    spec:
+      containers:
+        - name: main-app
+          image: crdboard-main:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CRDBOARD_ENV
+              value: production
+            - name: CRDBOARD_BASE_DIR
+              value: /app
+            - name: CRDBOARD_DATA_DIR
+              value: /app/data
+            - name: CRDBOARD_TABLE_SERVER_HOST
+              value: table-server-1
+            - name: CRDBOARD_TABLE_SERVER_PUBLIC_HOST
+              value: 127.0.0.1
+            - name: CRDBOARD_TABLE_SERVER_BASE_PORT
+              value: "7000"
+            - name: CRDBOARD_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: crdboard-secrets
+                  key: CRDBOARD_SECRET_KEY
+            - name: CRDBOARD_TABLE_ACCESS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: crdboard-secrets
+                  key: CRDBOARD_TABLE_ACCESS_SECRET
+          ports:
+            - containerPort: 5000
+          volumeMounts:
+            - name: main-app-data
+              mountPath: /app/data
+      volumes:
+        - name: main-app-data
+          persistentVolumeClaim:
+            claimName: main-app-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: main-app
+spec:
+  selector:
+    app: main-app
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: table-server-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: table-server-1
+  template:
+    metadata:
+      labels:
+        app: table-server-1
+    spec:
+      containers:
+        - name: table-server
+          image: crdboard-table-server:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CRDBOARD_ENV
+              value: production
+            - name: CRDBOARD_TABLE_ID
+              value: "1"
+            - name: CRDBOARD_TABLE_DB_DIR
+              value: /app/data/tables
+            - name: CRDBOARD_TABLE_ACCESS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: crdboard-secrets
+                  key: CRDBOARD_TABLE_ACCESS_SECRET
+          ports:
+            - containerPort: 7000
+          volumeMounts:
+            - name: table-server-data
+              mountPath: /app/data/tables
+      volumes:
+        - name: table-server-data
+          persistentVolumeClaim:
+            claimName: table-server-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: table-server-1
+spec:
+  selector:
+    app: table-server-1
+  ports:
+    - name: http
+      port: 7001
+      targetPort: 7000

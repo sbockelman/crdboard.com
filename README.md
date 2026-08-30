@@ -60,3 +60,28 @@ If using Docker Compose, set `CRDBOARD_SECRET_KEY` and `CRDBOARD_TABLE_ACCESS_SE
 - `Dockerfile.main` builds the main app image.
 - `Dockerfile.table-server` builds the table-server image.
 - `docker-compose.yml` provides local orchestration with one main app and one example table-server.
+- `deployment.yml` provides a Kubernetes deployment with one main app service and one example table-server service for table `1`.
+
+### Kubernetes
+
+1. Build the images:
+
+```bash
+docker build -f Dockerfile.main -t crdboard-main:latest .
+docker build -f Dockerfile.table-server -t crdboard-table-server:latest .
+```
+
+2. Apply the manifest:
+
+```bash
+kubectl apply -f deployment.yml
+```
+
+3. For local access, forward both services:
+
+```bash
+kubectl port-forward svc/main-app 5000:5000
+kubectl port-forward svc/table-server-1 7001:7001
+```
+
+The manifest expects `crdboard-secrets` values in `deployment.yml` to be updated before deployment. It sets `CRDBOARD_TABLE_SERVER_PUBLIC_HOST` to `127.0.0.1` so the browser can connect to the example table-server while those port-forwards are active.
