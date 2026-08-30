@@ -1,0 +1,120 @@
+name: k3d deployment test
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.0
+
+      - name: Install k3d
+        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.7.5 bash
+
+      - name: Build application images
+        run: |
+          docker build -f Dockerfile.main -t crdboard-main:latest .
+          docker build -f Dockerfile.table-server -t crdboard-table-server:latest .
+
+      - name: Create k3d cluster
+        run: k3d cluster create crdboard-ci --wait
+
+      - name: Import images into k3d
+        run: |
+          k3d image import crdboard-main:latest --cluster crdboard-ci
+          k3d image import crdboard-table-server:latest --cluster crdboard-ci
+
+      - name: Deploy Kubernetes resources
+        run: |
+          kubectl create secret generic crdboard-secrets \
+            --from-literal=CRDBOARD_SECRET_KEY=ci-secret-key \
+            --from-literal=CRDBOARD_TABLE_ACCESS_SECRET=ci-table-access-secret
+          kubectl apply -f deployment.yml
+
+      - name: Wait for deployments
+        run: |
+          kubectl rollout status deployment/main-app --timeout=180s
+          kubectl rollout status deployment/table-server-1 --timeout=180s
+
+      - name: Smoke test deployed services
+        run: |
+          set -euo pipefail
+          kubectl port-forward svc/main-app 5000:5000 >/tmp/main-app-port-forward.log 2>&1 &
+          MAIN_PID=$!
+          kubectl port-forward svc/table-server-1 7001:7001 >/tmp/table-server-port-forward.log 2>&1 &
+          TABLE_PID=$!
+          cleanup() {
+            kill "$MAIN_PID" "$TABLE_PID" || true
+          }
+          trap cleanup EXIT
+
+          curl --fail --retry 20 --retry-connrefused --retry-delay 2 http://127.0.0.1:5000/
+          curl --fail --retry 20 --retry-connrefused --retry-delay 2 http://127.0.0.1:7001/health
+
+          curl --fail --retry 20 --retry-connrefused --retry-delay 2 \
+            -c cookies.txt \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci-user","password":"pw"}' \
+            http://127.0.0.1:5000/api/register
+
+          curl --fail --retry 20 --retry-connrefused --retry-delay 2 \
+            -b cookies.txt \
+            -c cookies.txt \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"CI Table"}' \
+            http://127.0.0.1:5000/api/tables \
+            -o table.json
+
+          curl --fail --retry 20 --retry-connrefused --retry-delay 2 \
+            -b cookies.txt \
+            http://127.0.0.1:5000/api/tables/1/connect \
+            -o connect.json
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          table = json.loads(Path("table.json").read_text())
+          connect = json.loads(Path("connect.json").read_text())
+
+          assert table["table"]["id"] == 1
+          assert connect["tableId"] == 1
+          assert connect["socketUrl"] == "http://127.0.0.1:7001"
+          assert connect["accessToken"]
+          assert connect["serverStatus"] in {"assigned", "running", "stopped"}
+          PY
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          kubectl get all
+          kubectl get pvc
+          kubectl logs deployment/main-app || true
+          kubectl logs deployment/table-server-1 || true
+
+      - name: Delete k3d cluster
+        if: always()
+        run: k3d cluster delete crdboard-ci

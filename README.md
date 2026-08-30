@@ -61,6 +61,7 @@ If using Docker Compose, set `CRDBOARD_SECRET_KEY` and `CRDBOARD_TABLE_ACCESS_SE
 - `Dockerfile.table-server` builds the table-server image.
 - `docker-compose.yml` provides local orchestration with one main app and one example table-server.
 - `deployment.yml` provides a Kubernetes deployment with one main app service and one example table-server service for table `1`.
+- `.github/workflows/k3d-deploy.yml` deploys `deployment.yml` into k3d and smoke-tests it for pull requests targeting `main`.
 
 ### Kubernetes
 
