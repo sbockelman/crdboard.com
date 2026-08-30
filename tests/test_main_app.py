@@ -25,6 +25,13 @@ def test_register_create_table_invite_accept(tmp_path: Path):
     accept_res = client2.post(f"/api/invites/{token}/accept")
     assert accept_res.status_code == 200
 
+    client3 = app.test_client()
+    reg3 = client3.post("/api/register", json={"username": "charlie", "password": "pw"})
+    assert reg3.status_code == 200
+    second_accept = client3.post(f"/api/invites/{token}/accept")
+    assert second_accept.status_code == 400
+    assert second_accept.get_json()["error"] == "invite invalid or expired"
+
     list_res = client2.get("/api/tables")
     assert list_res.status_code == 200
     ids = [t["id"] for t in list_res.get_json()["tables"]]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from functools import wraps
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ from .config import (
     TABLE_ACCESS_SECRET,
     TABLE_SERVER_BASE_PORT,
     TABLE_SERVER_HOST,
+    TABLE_SERVER_PUBLIC_HOST,
 )
 from .main_db import MainRepository
 from .table_manager import TableServerCoordinator
@@ -155,7 +157,10 @@ def create_main_app(data_dir: Path | None = None) -> Flask:
         invite = repository.get_invite(token)
         if not invite:
             return jsonify({"error": "invite not found"}), 404
-        table_id = repository.accept_invite(token, user["id"])
+        try:
+            table_id = repository.accept_invite(token, user["id"])
+        except ValueError:
+            return jsonify({"error": "invite invalid or expired"}), 400
         coordinator.assign(table_id)
         return jsonify({"tableId": table_id})
 
@@ -177,7 +182,7 @@ def create_main_app(data_dir: Path | None = None) -> Flask:
         return jsonify(
             {
                 "tableId": table_id,
-                "socketUrl": assignment.ws_url,
+                "socketUrl": f"http://{TABLE_SERVER_PUBLIC_HOST}:{assignment.port}",
                 "accessToken": token,
                 "serverStatus": assignment.status,
                 "containerName": assignment.container_name,
@@ -199,7 +204,7 @@ def create_main_app(data_dir: Path | None = None) -> Flask:
                 "docker run -d "
                 f"--name {assignment.container_name} "
                 f"-e CRDBOARD_TABLE_ID={table_id} "
-                f"-e CRDBOARD_TABLE_ACCESS_SECRET={TABLE_ACCESS_SECRET} "
+                "-e CRDBOARD_TABLE_ACCESS_SECRET=<set-from-secret-manager> "
                 f"-p {assignment.port}:7000 crdboard-table-server"
             ),
         }
@@ -212,4 +217,4 @@ app = create_main_app()
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=os.getenv("FLASK_DEBUG") == "1")

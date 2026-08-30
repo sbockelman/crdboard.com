@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from collections import defaultdict
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from flask import Flask, request
@@ -21,13 +22,14 @@ def create_table_server_app() -> tuple[Flask, SocketIO]:
     state_store = TableStateStore(db_path)
 
     app = Flask(__name__)
-    app.config["SECRET_KEY"] = os.getenv("CRDBOARD_TABLE_SERVER_SECRET_KEY", "table-server-dev-secret")
+    app.config["SECRET_KEY"] = os.getenv("CRDBOARD_TABLE_SERVER_SECRET_KEY", "crdboard-dev-table-server-secret")
     socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
     room_name = f"table-{table_id}"
     sid_users: dict[str, dict[str, Any]] = {}
     presence: dict[int, dict[str, Any]] = {}
     user_sids: dict[int, set[str]] = defaultdict(set)
+    presence_lock = Lock()
 
     @app.get("/health")
     def health():
@@ -58,9 +60,11 @@ def create_table_server_app() -> tuple[Flask, SocketIO]:
             return False
         user = {"id": int(claims["user_id"]), "username": claims["username"]}
         sid = request.sid
-        sid_users[sid] = user
-        user_sids[user["id"]].add(sid)
-        presence[user["id"]] = user
+        with presence_lock:
+            sid_users[sid] = user
+            user_sids[user["id"]].add(sid)
+            presence[user["id"]] = user
+            presence_snapshot = list(presence.values())
 
         join_room(room_name)
         requested_seq = 0
@@ -76,29 +80,32 @@ def create_table_server_app() -> tuple[Flask, SocketIO]:
                 "snapshot": snapshot["state"] if snapshot else state_store.get_state(),
                 "snapshotEventSeq": snapshot["eventSeq"] if snapshot else 0,
                 "events": state_store.get_events_since(requested_seq),
-                "presence": list(presence.values()),
+                "presence": presence_snapshot,
                 "lastEventSeq": state_store.get_last_event_seq(),
             },
         )
-        emit("presence_update", {"presence": list(presence.values())}, to=room_name)
+        emit("presence_update", {"presence": presence_snapshot}, to=room_name)
 
     @socketio.on("disconnect")
     def disconnect():
         sid = request.sid
-        user = sid_users.pop(sid, None)
-        if not user:
-            return
-        user_sids[user["id"]].discard(sid)
-        if not user_sids[user["id"]]:
-            user_sids.pop(user["id"], None)
-            presence.pop(user["id"], None)
+        with presence_lock:
+            user = sid_users.pop(sid, None)
+            if not user:
+                return
+            user_sids[user["id"]].discard(sid)
+            if not user_sids[user["id"]]:
+                user_sids.pop(user["id"], None)
+                presence.pop(user["id"], None)
+            presence_snapshot = list(presence.values())
         leave_room(room_name)
-        emit("presence_update", {"presence": list(presence.values())}, to=room_name)
+        emit("presence_update", {"presence": presence_snapshot}, to=room_name)
 
     @socketio.on("operation")
     def operation(message):
         sid = request.sid
-        user = sid_users.get(sid)
+        with presence_lock:
+            user = sid_users.get(sid)
         if not user:
             emit("operation_ack", {"ok": False, "error": "Unauthorized"})
             return
@@ -123,7 +130,7 @@ def create_table_server_app() -> tuple[Flask, SocketIO]:
             "actorUserId": user["id"],
         }
         emit("operation_ack", {"ok": True, "event": event, "clientOpId": client_op_id})
-        emit("state_event", event, to=room_name)
+        emit("state_event", event, to=room_name, skip_sid=request.sid)
 
     return app, socketio
 
@@ -132,4 +139,4 @@ app, socketio = create_table_server_app()
 
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=7000, debug=True)
+    socketio.run(app, host="0.0.0.0", port=7000, debug=os.getenv("FLASK_DEBUG") == "1")

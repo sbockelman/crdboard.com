@@ -8,9 +8,10 @@ services:
     environment:
       CRDBOARD_BASE_DIR: /app
       CRDBOARD_DATA_DIR: /app/data
-      CRDBOARD_SECRET_KEY: dev-secret
-      CRDBOARD_TABLE_ACCESS_SECRET: table-dev-secret
-      CRDBOARD_TABLE_SERVER_HOST: localhost
+      CRDBOARD_SECRET_KEY: ${CRDBOARD_SECRET_KEY}
+      CRDBOARD_TABLE_ACCESS_SECRET: ${CRDBOARD_TABLE_ACCESS_SECRET}
+      CRDBOARD_TABLE_SERVER_HOST: table-server-1
+      CRDBOARD_TABLE_SERVER_PUBLIC_HOST: localhost
       CRDBOARD_TABLE_SERVER_BASE_PORT: 7000
     ports:
       - "5000:5000"
@@ -23,7 +24,7 @@ services:
       dockerfile: Dockerfile.table-server
     environment:
       CRDBOARD_TABLE_ID: 1
-      CRDBOARD_TABLE_ACCESS_SECRET: table-dev-secret
+      CRDBOARD_TABLE_ACCESS_SECRET: ${CRDBOARD_TABLE_ACCESS_SECRET}
       CRDBOARD_TABLE_DB_DIR: /app/data/tables
     ports:
       - "7001:7000"

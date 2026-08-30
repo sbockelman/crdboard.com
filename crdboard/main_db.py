@@ -25,6 +25,9 @@ class MainRepository:
         try:
             yield conn
             conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 
@@ -170,8 +173,10 @@ class MainRepository:
             invite = conn.execute("SELECT * FROM invites WHERE token = ?", (token,)).fetchone()
             if not invite:
                 raise ValueError("Invite not found")
+            if datetime.fromisoformat(invite["expires_at"]) < datetime.now(UTC):
+                raise ValueError("Invite expired")
             if invite["accepted_by_user_id"]:
-                return int(invite["table_id"])
+                raise ValueError("Invite already used")
             conn.execute(
                 "UPDATE invites SET accepted_by_user_id = ? WHERE token = ?",
                 (user_id, token),

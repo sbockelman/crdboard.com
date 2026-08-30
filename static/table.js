@@ -8,6 +8,7 @@
     selectedObjectId: null,
     pendingClientOps: new Set(),
     lastEventSeq: 0,
+    drag: null,
   };
 
   function log(msg, data) {
@@ -48,38 +49,40 @@
   }
 
   function enableDragging(el, objectId) {
-    let dragging = false;
-    let startX = 0;
-    let startY = 0;
     el.addEventListener("mousedown", (e) => {
-      dragging = true;
-      startX = e.clientX;
-      startY = e.clientY;
+      state.drag = {
+        objectId,
+        startX: e.clientX,
+        startY: e.clientY,
+      };
       el.style.cursor = "grabbing";
       state.selectedObjectId = objectId;
     });
-    window.addEventListener("mouseup", () => {
-      dragging = false;
-      el.style.cursor = "grab";
-    });
-    window.addEventListener("mousemove", (e) => {
-      if (!dragging) return;
-      const obj = state.objects.get(objectId);
-      if (!obj) return;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      startX = e.clientX;
-      startY = e.clientY;
-      obj.position.x += dx;
-      obj.position.y += dy;
-      upsertObject(obj);
-    });
-    el.addEventListener("mouseup", () => {
-      const obj = state.objects.get(objectId);
-      if (!obj) return;
-      sendOperation("move", { objectId, position: obj.position });
-    });
   }
+
+  window.addEventListener("mousemove", (e) => {
+    if (!state.drag) return;
+    const obj = state.objects.get(state.drag.objectId);
+    if (!obj) return;
+    const dx = e.clientX - state.drag.startX;
+    const dy = e.clientY - state.drag.startY;
+    state.drag.startX = e.clientX;
+    state.drag.startY = e.clientY;
+    obj.position.x += dx;
+    obj.position.y += dy;
+    upsertObject(obj);
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (!state.drag) return;
+    const objectId = state.drag.objectId;
+    state.drag = null;
+    const obj = state.objects.get(objectId);
+    const el = document.getElementById(`obj-${objectId}`);
+    if (el) el.style.cursor = "grab";
+    if (!obj) return;
+    sendOperation("move", { objectId, position: obj.position });
+  });
 
   const connResp = await fetch(`/api/tables/${tableId}/connect`);
   const conn = await connResp.json();

@@ -46,6 +46,8 @@ CRDBOARD_TABLE_ID=1 python table_server_app.py
 
 4. Open `http://localhost:5000`.
 
+If using Docker Compose, set `CRDBOARD_SECRET_KEY` and `CRDBOARD_TABLE_ACCESS_SECRET` in your shell or `.env` file before `docker compose up`. `CRDBOARD_TABLE_SERVER_HOST` is for internal routing/orchestration and `CRDBOARD_TABLE_SERVER_PUBLIC_HOST` is the client-facing host used in browser connection URLs.
+
 ## Architecture notes
 
 - Main app persists auth/table/invite/membership metadata in `data/main.sqlite`.
