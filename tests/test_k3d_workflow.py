@@ -27,4 +27,5 @@ def test_k3d_workflow_runs_for_pull_requests_to_main_and_deploys_manifest():
     assert 'TABLE_ID="$(python - <<' in workflow
     assert "-c cookies.txt" in workflow
     assert 'http://127.0.0.1:5000/api/tables/${TABLE_ID}/connect' in workflow
+    assert 'assert connect["serverStatus"] in {"assigned", "running"}' in workflow
     assert 'assert connect["socketUrl"] == "http://127.0.0.1:7001"' in workflow
