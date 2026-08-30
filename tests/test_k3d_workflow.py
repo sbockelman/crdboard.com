@@ -19,4 +19,7 @@ def test_k3d_workflow_runs_for_pull_requests_to_main_and_deploys_manifest():
     assert "kubectl port-forward svc/main-app 5000:5000" in workflow
     assert "kubectl port-forward svc/table-server-1 7001:7001" in workflow
     assert "http://127.0.0.1:7001/health" in workflow
+    assert 'CI_PASSWORD="$(openssl rand -hex 16)"' in workflow
+    assert 'TABLE_ID="$(python - <<' in workflow
+    assert 'http://127.0.0.1:5000/api/tables/${TABLE_ID}/connect' in workflow
     assert 'assert connect["socketUrl"] == "http://127.0.0.1:7001"' in workflow

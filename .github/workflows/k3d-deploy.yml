@@ -62,6 +62,8 @@ jobs:
       - name: Smoke test deployed services
         run: |
           set -euo pipefail
+          CI_USERNAME="ci-user-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          CI_PASSWORD="$(openssl rand -hex 16)"
           kubectl port-forward svc/main-app 5000:5000 >/tmp/main-app-port-forward.log 2>&1 &
           MAIN_PID=$!
           kubectl port-forward svc/table-server-1 7001:7001 >/tmp/table-server-port-forward.log 2>&1 &
@@ -77,7 +79,7 @@ jobs:
           curl --fail --retry 20 --retry-connrefused --retry-delay 2 \
             -c cookies.txt \
             -H 'Content-Type: application/json' \
-            -d '{"username":"ci-user","password":"pw"}' \
+            -d "{\"username\":\"${CI_USERNAME}\",\"password\":\"${CI_PASSWORD}\"}" \
             http://127.0.0.1:5000/api/register
 
           curl --fail --retry 20 --retry-connrefused --retry-delay 2 \
@@ -88,9 +90,18 @@ jobs:
             http://127.0.0.1:5000/api/tables \
             -o table.json
 
+          TABLE_ID="$(python - <<'PY'
+          import json
+          from pathlib import Path
+
+          table = json.loads(Path("table.json").read_text())
+          print(table["table"]["id"])
+          PY
+          )"
+
           curl --fail --retry 20 --retry-connrefused --retry-delay 2 \
             -b cookies.txt \
-            http://127.0.0.1:5000/api/tables/1/connect \
+            "http://127.0.0.1:5000/api/tables/${TABLE_ID}/connect" \
             -o connect.json
 
           python - <<'PY'
@@ -100,8 +111,8 @@ jobs:
           table = json.loads(Path("table.json").read_text())
           connect = json.loads(Path("connect.json").read_text())
 
-          assert table["table"]["id"] == 1
-          assert connect["tableId"] == 1
+          assert table["table"]["id"] >= 1
+          assert connect["tableId"] == table["table"]["id"]
           assert connect["socketUrl"] == "http://127.0.0.1:7001"
           assert connect["accessToken"]
           assert connect["serverStatus"] in {"assigned", "running", "stopped"}
