@@ -13,6 +13,7 @@ def test_k3d_workflow_runs_for_pull_requests_to_main_and_deploys_manifest():
     assert "k3d cluster create crdboard-ci --wait" in workflow
     assert "k3d image import crdboard-main:latest --cluster crdboard-ci" in workflow
     assert "k3d image import crdboard-table-server:latest --cluster crdboard-ci" in workflow
+    assert "set -euo pipefail" in workflow
     assert 'CRDBOARD_SECRET_KEY="$(openssl rand -hex 32)"' in workflow
     assert 'CRDBOARD_TABLE_ACCESS_SECRET="$(openssl rand -hex 32)"' in workflow
     assert "kubectl apply -f deployment.yml" in workflow
@@ -24,5 +25,6 @@ def test_k3d_workflow_runs_for_pull_requests_to_main_and_deploys_manifest():
     assert "http://127.0.0.1:7001/health" in workflow
     assert 'CI_PASSWORD="$(openssl rand -hex 16)"' in workflow
     assert 'TABLE_ID="$(python - <<' in workflow
+    assert "-c cookies.txt" in workflow
     assert 'http://127.0.0.1:5000/api/tables/${TABLE_ID}/connect' in workflow
     assert 'assert connect["socketUrl"] == "http://127.0.0.1:7001"' in workflow
