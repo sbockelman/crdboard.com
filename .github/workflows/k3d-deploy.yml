@@ -67,29 +67,33 @@ jobs:
           set -euo pipefail
           CI_USERNAME="ci-user-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           CI_PASSWORD="$(openssl rand -hex 16)"
+          TMP_DIR="$(mktemp -d)"
+          COOKIES_FILE="${TMP_DIR}/cookies.txt"
           kubectl port-forward svc/main-app 5000:5000 >/tmp/main-app-port-forward.log 2>&1 &
           MAIN_PID=$!
           kubectl port-forward svc/table-server-1 7001:7001 >/tmp/table-server-port-forward.log 2>&1 &
           TABLE_PID=$!
           cleanup() {
             kill "$MAIN_PID" "$TABLE_PID" || true
+            rm -rf "$TMP_DIR"
           }
           trap cleanup EXIT
+          sleep 2
 
           curl --fail --retry 20 --retry-all-errors --retry-connrefused --retry-delay 2 http://127.0.0.1:5000/
           curl --fail --retry 20 --retry-all-errors --retry-connrefused --retry-delay 2 http://127.0.0.1:7001/health
 
           curl --fail --retry 20 --retry-connrefused --retry-delay 2 \
             --retry-all-errors \
-            -c cookies.txt \
+            -c "${COOKIES_FILE}" \
             -H 'Content-Type: application/json' \
             -d "{\"username\":\"${CI_USERNAME}\",\"password\":\"${CI_PASSWORD}\"}" \
             http://127.0.0.1:5000/api/register
 
           curl --fail --retry 20 --retry-connrefused --retry-delay 2 \
             --retry-all-errors \
-            -b cookies.txt \
-            -c cookies.txt \
+            -b "${COOKIES_FILE}" \
+            -c "${COOKIES_FILE}" \
             -H 'Content-Type: application/json' \
             -d '{"name":"CI Table"}' \
             http://127.0.0.1:5000/api/tables \
@@ -106,8 +110,8 @@ jobs:
 
           curl --fail --retry 20 --retry-connrefused --retry-delay 2 \
             --retry-all-errors \
-            -b cookies.txt \
-            -c cookies.txt \
+            -b "${COOKIES_FILE}" \
+            -c "${COOKIES_FILE}" \
             "http://127.0.0.1:5000/api/tables/${TABLE_ID}/connect" \
             -o connect.json
 

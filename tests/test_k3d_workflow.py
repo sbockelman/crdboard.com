@@ -21,11 +21,15 @@ def test_k3d_workflow_runs_for_pull_requests_to_main_and_deploys_manifest():
     assert "kubectl rollout status deployment/table-server-1 --timeout=180s" in workflow
     assert "kubectl port-forward svc/main-app 5000:5000" in workflow
     assert "kubectl port-forward svc/table-server-1 7001:7001" in workflow
+    assert 'TMP_DIR="$(mktemp -d)"' in workflow
+    assert 'COOKIES_FILE="${TMP_DIR}/cookies.txt"' in workflow
+    assert 'rm -rf "$TMP_DIR"' in workflow
+    assert "sleep 2" in workflow
     assert "--retry-all-errors" in workflow
     assert "http://127.0.0.1:7001/health" in workflow
     assert 'CI_PASSWORD="$(openssl rand -hex 16)"' in workflow
     assert 'TABLE_ID="$(python - <<' in workflow
-    assert "-c cookies.txt" in workflow
+    assert '-c "${COOKIES_FILE}"' in workflow
     assert 'http://127.0.0.1:5000/api/tables/${TABLE_ID}/connect' in workflow
     assert 'assert connect["serverStatus"] in {"assigned", "running"}' in workflow
     assert 'assert connect["socketUrl"] == "http://127.0.0.1:7001"' in workflow
