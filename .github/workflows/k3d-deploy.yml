@@ -49,9 +49,11 @@ jobs:
 
       - name: Deploy Kubernetes resources
         run: |
+          CRDBOARD_SECRET_KEY="$(openssl rand -hex 32)"
+          CRDBOARD_TABLE_ACCESS_SECRET="$(openssl rand -hex 32)"
           kubectl create secret generic crdboard-secrets \
-            --from-literal=CRDBOARD_SECRET_KEY=ci-secret-key \
-            --from-literal=CRDBOARD_TABLE_ACCESS_SECRET=ci-table-access-secret
+            --from-literal=CRDBOARD_SECRET_KEY="${CRDBOARD_SECRET_KEY}" \
+            --from-literal=CRDBOARD_TABLE_ACCESS_SECRET="${CRDBOARD_TABLE_ACCESS_SECRET}"
           kubectl apply -f deployment.yml
 
       - name: Wait for deployments
@@ -73,16 +75,18 @@ jobs:
           }
           trap cleanup EXIT
 
-          curl --fail --retry 20 --retry-connrefused --retry-delay 2 http://127.0.0.1:5000/
-          curl --fail --retry 20 --retry-connrefused --retry-delay 2 http://127.0.0.1:7001/health
+          curl --fail --retry 20 --retry-all-errors --retry-connrefused --retry-delay 2 http://127.0.0.1:5000/
+          curl --fail --retry 20 --retry-all-errors --retry-connrefused --retry-delay 2 http://127.0.0.1:7001/health
 
           curl --fail --retry 20 --retry-connrefused --retry-delay 2 \
+            --retry-all-errors \
             -c cookies.txt \
             -H 'Content-Type: application/json' \
             -d "{\"username\":\"${CI_USERNAME}\",\"password\":\"${CI_PASSWORD}\"}" \
             http://127.0.0.1:5000/api/register
 
           curl --fail --retry 20 --retry-connrefused --retry-delay 2 \
+            --retry-all-errors \
             -b cookies.txt \
             -c cookies.txt \
             -H 'Content-Type: application/json' \
@@ -100,6 +104,7 @@ jobs:
           )"
 
           curl --fail --retry 20 --retry-connrefused --retry-delay 2 \
+            --retry-all-errors \
             -b cookies.txt \
             "http://127.0.0.1:5000/api/tables/${TABLE_ID}/connect" \
             -o connect.json
