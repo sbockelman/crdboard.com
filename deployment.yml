@@ -108,6 +108,11 @@ spec:
               value: "1"
             - name: CRDBOARD_TABLE_DB_DIR
               value: /app/data/tables
+            - name: CRDBOARD_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: crdboard-secrets
+                  key: CRDBOARD_SECRET_KEY
             - name: CRDBOARD_TABLE_ACCESS_SECRET
               valueFrom:
                 secretKeyRef:
